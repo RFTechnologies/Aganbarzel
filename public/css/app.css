@@ -1,0 +1,5 @@
+/* @import "~@shopify/polaris/styles.css"; */
+
+.Polaris-Tabs__Tab:focus:not(:active) .Polaris-Tabs__Title::after{
+    box-shadow: none !important;
+}
