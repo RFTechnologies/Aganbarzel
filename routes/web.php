@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\RalController;
+use App\Http\Controllers\Storefront\AppProxyOrderProgressController;
 
 use Illuminate\Support\Facades\Auth;
 
@@ -50,3 +51,15 @@ Route::post('tags/updateDate',[TagController::class, 'updateDate'])->name('tags.
 Route::get('/rals',[RalController::class, 'index'])->name('rals');
 Route::post('/rals/delete',[RalController::class, 'delete'])->name('rals.delete');
 Route::post('rals/add',[RalController::class, 'add'])->middleware(['verify.shopify'])->name('rals.add');
+
+/*
+|--------------------------------------------------------------------------
+| Shopify App Proxy — storefront order progress (customer account)
+|--------------------------------------------------------------------------
+|
+| Configure in Shopify Partner: App proxy URL -> https://YOUR_APP_DOMAIN/proxy/order-progress
+| Subpath prefix must match theme fetch: /apps/{prefix}/order-progress
+|
+*/
+Route::get('/proxy/order-progress', [AppProxyOrderProgressController::class, 'show'])
+    ->name('storefront.app-proxy.order-progress');
