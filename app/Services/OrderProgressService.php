@@ -21,6 +21,85 @@ class OrderProgressService
             throw new RuntimeException('Forbidden');
         }
 
+        return $this->buildFromOrderArray($order);
+    }
+
+    /**
+     * New-customer-accounts extensions often pass order GID. Convert safely.
+     */
+    public function normalizeOrderId(string $orderIdOrGid): int
+    {
+        $value = trim($orderIdOrGid);
+        if ($value === '') {
+            return 0;
+        }
+        if (ctype_digit($value)) {
+            return (int) $value;
+        }
+
+        if (preg_match('/gid:\/\/shopify\/Order\/(\d+)/', $value, $m) === 1) {
+            return (int) $m[1];
+        }
+
+        return 0;
+    }
+
+    public function parseCustomerIdFromTokenSub(?string $sub): int
+    {
+        if ($sub === null || $sub === '') {
+            return 0;
+        }
+
+        if (preg_match('/gid:\/\/shopify\/Customer\/(\d+)/', $sub, $m) === 1) {
+            return (int) $m[1];
+        }
+
+        return 0;
+    }
+
+    private function fetchOrder(User $shop, int $orderId): ?array
+    {
+        $version = config('shopify-app.api_version', '2022-04');
+        $path = '/admin/api/'.$version.'/orders/'.$orderId.'.json';
+
+        $response = $shop->api()->rest('GET', $path);
+
+        if (! empty($response['errors'])) {
+            return null;
+        }
+
+        $body = $response['body'] ?? null;
+        if (is_object($body)) {
+            $body = json_decode(json_encode($body), true);
+        }
+        if (! is_array($body)) {
+            return null;
+        }
+
+        $order = $body['order'] ?? null;
+        if (is_object($order)) {
+            $order = json_decode(json_encode($order), true);
+        }
+
+        return is_array($order) ? $order : null;
+    }
+
+    private function normalizeTags(string $tagsCsv): array
+    {
+        $parts = array_map('trim', explode(',', $tagsCsv));
+        $out = [];
+        foreach ($parts as $p) {
+            if ($p === '') {
+                continue;
+            }
+            $out[] = mb_strtolower($p, 'UTF-8');
+        }
+
+        return $out;
+    }
+
+    private function buildFromOrderArray(array $order): array
+    {
         $tags = $this->normalizeTags((string) Arr::get($order, 'tags', ''));
         $financialStatus = (string) Arr::get($order, 'financial_status', '');
         $fulfillmentStatus = (string) Arr::get($order, 'fulfillment_status', '');
@@ -74,47 +153,6 @@ class OrderProgressService
             'eta_summary_he' => $etaSummaryHe,
             'updated_at' => (string) Arr::get($order, 'updated_at', ''),
         ];
-    }
-
-    private function fetchOrder(User $shop, int $orderId): ?array
-    {
-        $version = config('shopify-app.api_version', '2022-04');
-        $path = '/admin/api/'.$version.'/orders/'.$orderId.'.json';
-
-        $response = $shop->api()->rest('GET', $path);
-
-        if (! empty($response['errors'])) {
-            return null;
-        }
-
-        $body = $response['body'] ?? null;
-        if (is_object($body)) {
-            $body = json_decode(json_encode($body), true);
-        }
-        if (! is_array($body)) {
-            return null;
-        }
-
-        $order = $body['order'] ?? null;
-        if (is_object($order)) {
-            $order = json_decode(json_encode($order), true);
-        }
-
-        return is_array($order) ? $order : null;
-    }
-
-    private function normalizeTags(string $tagsCsv): array
-    {
-        $parts = array_map('trim', explode(',', $tagsCsv));
-        $out = [];
-        foreach ($parts as $p) {
-            if ($p === '') {
-                continue;
-            }
-            $out[] = mb_strtolower($p, 'UTF-8');
-        }
-
-        return $out;
     }
 
     private function isPaymentBlocked(string $financialStatus): bool

@@ -1,0 +1,14 @@
+api_version = "2025-01"
+
+[[extensions]]
+name = "Customer Order Progress"
+handle = "customer-account-order-progress"
+type = "ui_extension"
+
+[[extensions.targeting]]
+target = "customer-account.order-status.block.render"
+module = "./src/index.jsx"
+
+[extensions.capabilities]
+api_access = true
+network_access = true

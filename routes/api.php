@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RalController;
+use App\Http\Controllers\Storefront\CustomerAccountOrderProgressController;
 
 /*
 |--------------------------------------------------------------------------
@@ -33,3 +34,16 @@ Route::get('/testing',function(){
 
 Route::post('/products/getvariant', [ProductController::class, 'getVariant']);
 Route::post('/products/updatevariant',[ProductController::class, 'updateVariant']);
+
+/*
+|--------------------------------------------------------------------------
+| New Customer Accounts endpoint
+|--------------------------------------------------------------------------
+|
+| Customer account UI extensions can call this endpoint with a Shopify
+| session token (Bearer JWT). It reuses the same checklist logic as the
+| classic App Proxy flow.
+|
+*/
+Route::get('/customer-account/order-progress', [CustomerAccountOrderProgressController::class, 'show'])
+    ->name('storefront.customer-account.order-progress');
