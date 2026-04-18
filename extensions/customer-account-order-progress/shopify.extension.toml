@@ -3,6 +3,9 @@ api_version = "2025-01"
 [[extensions]]
 name = "Customer Order Progress"
 handle = "customer-account-order-progress"
+
+uid = "44edc48e-e955-c139-1345-0a384df1e1c873a5313a"
+
 type = "ui_extension"
 
 [[extensions.targeting]]
