@@ -1,0 +1,22 @@
+# Shopify CLI app config — enables `shopify app deploy` from this repo root.
+# client_id is the app API key from Partner Dashboard (same as SHOPIFY_API_KEY in .env).
+# If deploy complains, run: shopify app config link
+
+client_id = "5ce265f0cd011b8612dffb530a54ce01"
+name = "rf-price-calculator"
+application_url = "https://staging.aganbarzel.co.il"
+embedded = true
+
+[access_scopes]
+scopes = "write_products,write_customers,write_draft_orders,read_orders,write_orders,read_shipping,write_shipping"
+
+[auth]
+redirect_urls = [
+  "https://aganbarzel.co.il/authenticate",
+  "https://aganbarzel.co.il/auth/callback",
+  "https://staging.aganbarzel.co.il/authenticate",
+  "https://staging.aganbarzel.co.il/auth/callback",
+]
+
+[webhooks]
+api_version = "2022-04"
