@@ -59,12 +59,35 @@ function delete_products($tag_name,$shop){
     function getVariantsIds($shop){
         $tag = 'product-with-calculator';
         $product = $shop->api()->graph('{products(first: 50, reverse: true, query: "tag:'.$tag.'"){edges {node {id}}}}');
-        $products = (array) $product['body']['data']['products']['edges'];
-        $size = count($products['container']);
+
+        $body = $product['body'] ?? null;
+        $data = is_array($body) ? ($body['data'] ?? null) : null;
+        if ($data === null || !empty($data['errors'] ?? [])) {
+            return ['ids' => [], 'variants_objs' => []];
+        }
+        $productsNode = $data['products'] ?? null;
+        if ($productsNode === null || !isset($productsNode['edges'])) {
+            return ['ids' => [], 'variants_objs' => []];
+        }
+        $edges = $productsNode['edges'];
+        if (is_object($edges) && method_exists($edges, 'toArray')) {
+            $edges = $edges->toArray();
+        }
+        if (!is_array($edges)) {
+            return ['ids' => [], 'variants_objs' => []];
+        }
+
+        $products = (array) $edges;
+        $container = $products['container'] ?? $edges;
+        if (!is_array($container)) {
+            return ['ids' => [], 'variants_objs' => []];
+        }
+
+        $size = count($container);
         $ids = [];
         $ids_dates_obj = [];
         if($size > 0){
-            foreach ($products['container'] as $item) {
+            foreach ($container as $item) {
                 $product_id = str_replace("gid://shopify/Product/","",$item['node']['id']);
                 $variants = $shop->api()->rest('GET', '/admin/api/2022-04/products/'.$product_id.'/variants.json',[
                     'fields' => 'id,created_at,product_id,image_id',
