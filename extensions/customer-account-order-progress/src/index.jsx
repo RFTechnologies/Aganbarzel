@@ -16,9 +16,9 @@ export default reactExtension(
 /**
  * IMPORTANT:
  * Set this to your deployed Laravel app URL (no trailing slash).
- * For your current setup this is likely: https://aganbarzel.co.il
+ * Staging (staging_rf / testing): use staging host. Production: use https://aganbarzel.co.il
  */
-const API_BASE_URL = "https://aganbarzel.co.il";
+const API_BASE_URL = "https://staging.aganbarzel.co.il";
 
 function OrderProgressBlock() {
   const api = useApi();
