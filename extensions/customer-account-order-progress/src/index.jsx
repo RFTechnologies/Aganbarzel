@@ -24,6 +24,7 @@ const API_BASE_URL = "https://staging.aganbarzel.co.il";
 function OrderProgressBlock() {
   const api = useApi();
   const order = useOrder();
+  const inCheckoutEditor = api.extension?.editor?.type === "checkout";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [payload, setPayload] = useState(null);
@@ -32,6 +33,10 @@ function OrderProgressBlock() {
     let mounted = true;
 
     async function run() {
+      if (inCheckoutEditor) {
+        return;
+      }
+
       if (order === undefined) {
         return;
       }
@@ -91,7 +96,22 @@ function OrderProgressBlock() {
     return () => {
       mounted = false;
     };
-  }, [api, order]);
+  }, [api, order, inCheckoutEditor]);
+
+  if (inCheckoutEditor) {
+    return (
+      <BlockStack spacing="tight">
+        <Text emphasis="bold">Order progress</Text>
+        <Banner status="info" title="Editor preview">
+          <Text>
+            The admin preview does not call your app API (session tokens differ
+            from real customer pages). Click Save, then open this order while
+            signed in as a customer to verify live progress.
+          </Text>
+        </Banner>
+      </BlockStack>
+    );
+  }
 
   if (loading) {
     return (

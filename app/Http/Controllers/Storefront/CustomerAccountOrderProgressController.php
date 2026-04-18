@@ -19,9 +19,8 @@ class CustomerAccountOrderProgressController extends Controller
             return response()->json(['error' => 'Invalid session token'], 401);
         }
 
-        $dest = (string) ($claims['dest'] ?? '');
-        $shopDomain = parse_url($dest, PHP_URL_HOST);
-        if (! is_string($shopDomain) || $shopDomain === '') {
+        $shopDomain = ShopifySessionToken::shopHostFromDest($claims['dest'] ?? null);
+        if ($shopDomain === null || $shopDomain === '') {
             return response()->json(['error' => 'Invalid token destination'], 401);
         }
 

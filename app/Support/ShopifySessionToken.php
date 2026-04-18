@@ -63,6 +63,34 @@ class ShopifySessionToken
         return $payload;
     }
 
+    /**
+     * Hostname from session token `dest` claim (customer account / App Bridge).
+     * Shopify may send a full URL or a bare hostname; parse_url() needs a scheme to return PHP_URL_HOST.
+     */
+    public static function shopHostFromDest(?string $dest): ?string
+    {
+        if ($dest === null) {
+            return null;
+        }
+
+        $dest = trim($dest);
+        if ($dest === '') {
+            return null;
+        }
+
+        if (str_contains($dest, '://') === false) {
+            $dest = 'https://'.ltrim($dest, '/');
+        }
+
+        $host = parse_url($dest, PHP_URL_HOST);
+
+        if (! is_string($host) || $host === '') {
+            return null;
+        }
+
+        return strtolower($host);
+    }
+
     private static function base64UrlDecode(string $input): ?string
     {
         $input = strtr($input, '-_', '+/');
