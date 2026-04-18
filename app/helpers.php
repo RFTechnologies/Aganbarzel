@@ -60,6 +60,10 @@ function delete_products($tag_name,$shop){
         $tag = 'product-with-calculator';
         $product = $shop->api()->graph('{products(first: 50, reverse: true, query: "tag:'.$tag.'"){edges {node {id}}}}');
 
+        if (!is_array($product)) {
+            return ['ids' => [], 'variants_objs' => []];
+        }
+
         $body = $product['body'] ?? null;
         $data = is_array($body) ? ($body['data'] ?? null) : null;
         if ($data === null || !empty($data['errors'] ?? [])) {
@@ -93,7 +97,11 @@ function delete_products($tag_name,$shop){
                     'fields' => 'id,created_at,product_id,image_id',
                     'limit' => 200
                 ]);
-                foreach ($variants['body']['variants'] as $variant) {
+                $variantRows = $variants['body']['variants'] ?? null;
+                if (!is_array($variantRows)) {
+                    continue;
+                }
+                foreach ($variantRows as $variant) {
                     array_push($ids, $variant['id']);
                     array_push($ids_dates_obj,[
                         'id' => $variant['id'],
