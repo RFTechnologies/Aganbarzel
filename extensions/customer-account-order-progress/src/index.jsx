@@ -5,6 +5,7 @@ import {
   Text,
   reactExtension,
   useApi,
+  useOrder,
 } from "@shopify/ui-extensions-react/customer-account";
 import {useEffect, useState} from "react";
 
@@ -22,6 +23,7 @@ const API_BASE_URL = "https://staging.aganbarzel.co.il";
 
 function OrderProgressBlock() {
   const api = useApi();
+  const order = useOrder();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [payload, setPayload] = useState(null);
@@ -30,14 +32,23 @@ function OrderProgressBlock() {
     let mounted = true;
 
     async function run() {
+      if (order === undefined) {
+        return;
+      }
+
+      const orderId = order?.id ? String(order.id) : "";
+      if (!orderId) {
+        if (mounted) {
+          setLoading(false);
+          setError("Unable to resolve order ID from customer account context.");
+        }
+        return;
+      }
+
       setLoading(true);
       setError("");
 
       try {
-        const orderId = extractOrderId(api);
-        if (!orderId) {
-          throw new Error("Unable to resolve order ID from customer account context.");
-        }
 
         const token = await api.sessionToken.get();
         if (!token) {
@@ -80,7 +91,7 @@ function OrderProgressBlock() {
     return () => {
       mounted = false;
     };
-  }, [api]);
+  }, [api, order]);
 
   if (loading) {
     return (
@@ -123,23 +134,4 @@ function OrderProgressBlock() {
       </BlockStack>
     </BlockStack>
   );
-}
-
-function extractOrderId(api) {
-  const target = api?.target || {};
-
-  const candidates = [
-    target?.order?.id,
-    target?.orderId,
-    target?.id,
-    api?.order?.id,
-  ];
-
-  for (const c of candidates) {
-    if (!c) continue;
-    const value = String(c);
-    if (value) return value;
-  }
-
-  return "";
 }
