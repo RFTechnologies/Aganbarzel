@@ -190,6 +190,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Customer account order progress — shop lookup
+    |--------------------------------------------------------------------------
+    |
+    | JWT dest/iss may use the storefront or account hostname (e.g. account.example.com)
+    | while osiset stores the shop as *.myshopify.com in users.name. Set this to that
+    | myshopify hostname so order-progress can resolve the User row when needed.
+    |
+    */
+
+    'customer_account_order_progress_shop_domain' => env('SHOPIFY_CUSTOMER_ACCOUNT_SHOP_DOMAIN', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | Shopify API Scopes
     |--------------------------------------------------------------------------
     |

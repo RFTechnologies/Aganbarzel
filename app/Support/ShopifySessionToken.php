@@ -91,6 +91,39 @@ class ShopifySessionToken
         return strtolower($host);
     }
 
+    /**
+     * Resolve shop hostname from verified session token claims.
+     * Tries `dest`, then `iss` (admin URL host is the *.myshopify.com shop).
+     * Customer-account tokens sometimes omit `dest` or use shapes that need normalizing.
+     *
+     * @param  array<string, mixed>  $claims
+     */
+    public static function shopHostFromSessionClaims(array $claims): ?string
+    {
+        foreach (['dest', 'iss'] as $key) {
+            if (! array_key_exists($key, $claims)) {
+                continue;
+            }
+            $raw = $claims[$key];
+            if ($raw === null || $raw === '') {
+                continue;
+            }
+            if (! is_string($raw)) {
+                if (is_scalar($raw)) {
+                    $raw = (string) $raw;
+                } else {
+                    continue;
+                }
+            }
+            $host = self::shopHostFromDest($raw);
+            if ($host !== null && $host !== '') {
+                return $host;
+            }
+        }
+
+        return null;
+    }
+
     private static function base64UrlDecode(string $input): ?string
     {
         $input = strtr($input, '-_', '+/');

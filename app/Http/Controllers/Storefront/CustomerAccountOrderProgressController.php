@@ -19,12 +19,16 @@ class CustomerAccountOrderProgressController extends Controller
             return response()->json(['error' => 'Invalid session token'], 401);
         }
 
-        $shopDomain = ShopifySessionToken::shopHostFromDest($claims['dest'] ?? null);
+        $shopDomain = ShopifySessionToken::shopHostFromSessionClaims($claims);
         if ($shopDomain === null || $shopDomain === '') {
             return response()->json(['error' => 'Invalid token destination'], 401);
         }
 
         $shop = User::where('name', $shopDomain)->first();
+        $fallbackName = config('shopify-app.customer_account_order_progress_shop_domain');
+        if ($shop === null && is_string($fallbackName) && $fallbackName !== '') {
+            $shop = User::where('name', $fallbackName)->first();
+        }
         if ($shop === null) {
             return response()->json(['error' => 'App not installed for this shop'], 404);
         }
