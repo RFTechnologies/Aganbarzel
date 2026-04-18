@@ -21,11 +21,15 @@
 import ApolloClient from "apollo-client";
 import { HttpLink } from "apollo-link-http";
 import { InMemoryCache } from "apollo-cache-inmemory";
-  
+
+  /** Shopify embeds the app with ?host=... (must pass through to App Bridge; never hardcode app domain here). */
+  function shopifyHostFromUrl() {
+    return new URLSearchParams(window.location.search).get("host") || "";
+  }
 
   const app = createApp({
-    apiKey: document.getElementById("apiKey").value, // API key from the Partner Dashboard
-    host: Buffer.from("https://aganbarzel.co.il").toString("base64"), // host from URL search parameter
+    apiKey: document.getElementById("apiKey").value,
+    host: shopifyHostFromUrl(),
   });
   export const client = new ApolloClient({
     link: new HttpLink({
@@ -57,8 +61,7 @@ import { InMemoryCache } from "apollo-cache-inmemory";
     const config = {
         apiKey : document.getElementById("apiKey").value,
         shopOrigin : document.getElementById("shopOrigin").value,
-        host: Buffer.from("https://aganbarzel.co.il").toString("base64"),
-        // host: Buffer.from("https://10b1-154-192-16-1.ngrok-free.app").toString("base64"),
+        host: shopifyHostFromUrl(),
         forceRedirect : true
     };
     return (
