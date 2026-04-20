@@ -84,93 +84,49 @@ class OrderProgressService
         return is_array($order) ? $order : null;
     }
 
-    private function normalizeTags(string $tagsCsv): array
-    {
-        $parts = array_map('trim', explode(',', $tagsCsv));
-        $out = [];
-        foreach ($parts as $p) {
-            if ($p === '') {
-                continue;
-            }
-            $out[] = mb_strtolower($p, 'UTF-8');
-        }
-
-        return $out;
-    }
-
     private function buildFromOrderArray(array $order): array
     {
-        $tags = $this->normalizeTags((string) Arr::get($order, 'tags', ''));
-        $financialStatus = (string) Arr::get($order, 'financial_status', '');
-        $fulfillmentStatus = (string) Arr::get($order, 'fulfillment_status', '');
-
-        $paymentBlocked = $this->isPaymentBlocked($financialStatus);
-
-        $stepsConfig = config('order-progress.steps', []);
-        $steps = [];
-        $pendingEtaDays = 0;
-
-        foreach ($stepsConfig as $row) {
-            $tag = strtolower(trim((string) ($row['tag'] ?? '')));
-            $done = $tag !== '' && in_array($tag, $tags, true);
-            $eta = (int) ($row['eta_days'] ?? 0);
-
-            if (! $done && ! $paymentBlocked) {
-                $pendingEtaDays += $eta;
-            }
-
-            $steps[] = [
-                'key' => (string) ($row['key'] ?? ''),
-                'label_he' => (string) ($row['label_he'] ?? ''),
-                'done' => $done,
-                'eta_days' => $done ? null : ($paymentBlocked ? null : $eta),
-            ];
-        }
-
-        $pickupTag = strtolower((string) config('order-progress.pickup_tag', ''));
-        $deliveryTag = strtolower((string) config('order-progress.delivery_tag', ''));
-
-        $branch = 'unknown';
-        if ($pickupTag !== '' && in_array($pickupTag, $tags, true)) {
-            $branch = 'pickup';
-        } elseif ($deliveryTag !== '' && in_array($deliveryTag, $tags, true)) {
-            $branch = 'delivery';
-        }
-
-        $etaSummaryHe = $this->formatEtaSummaryHe($pendingEtaDays, $paymentBlocked);
+        $orderTags = $this->orderTagsFromShopify((string) Arr::get($order, 'tags', ''));
 
         return [
             'order_name' => (string) Arr::get($order, 'name', ''),
-            'financial_status' => $financialStatus,
-            'fulfillment_status' => $fulfillmentStatus,
             'cancelled_at' => Arr::get($order, 'cancelled_at'),
-            'branch' => $branch,
-            'is_payment_blocked' => $paymentBlocked,
-            'payment_message_he' => $paymentBlocked
-                ? 'קיימת יתרת תשלום. שחרור המוצר או המשלוח יתאפשרו לאחר סגירת החשבון במלואו.'
-                : null,
-            'steps' => $steps,
-            'eta_summary_he' => $etaSummaryHe,
+            'order_tags' => $orderTags,
+            'steps' => [],
+            'eta_summary_he' => null,
+            'payment_message_he' => null,
+            'branch' => 'unknown',
+            'financial_status' => (string) Arr::get($order, 'financial_status', ''),
+            'fulfillment_status' => (string) Arr::get($order, 'fulfillment_status', ''),
+            'is_payment_blocked' => false,
             'updated_at' => (string) Arr::get($order, 'updated_at', ''),
         ];
     }
 
-    private function isPaymentBlocked(string $financialStatus): bool
+    /**
+     * Split Shopify Admin order tags (comma-separated). Preserves order,
+     * trims whitespace, de-duplicates case-insensitively. No config.
+     */
+    private function orderTagsFromShopify(string $tagsCsv): array
     {
-        $blocked = config('order-progress.payment_blocking_financial_statuses', []);
+        $parts = explode(',', $tagsCsv);
+        $seenLower = [];
+        $out = [];
 
-        return in_array(mb_strtolower($financialStatus, 'UTF-8'), $blocked, true);
-    }
+        foreach ($parts as $part) {
+            $tag = trim($part);
+            if ($tag === '') {
+                continue;
+            }
 
-    private function formatEtaSummaryHe(int $pendingEtaDays, bool $paymentBlocked): ?string
-    {
-        if ($paymentBlocked) {
-            return 'ההמשך תלוי בביצוע תשלום מלא.';
+            $lower = mb_strtolower($tag, 'UTF-8');
+            if (isset($seenLower[$lower])) {
+                continue;
+            }
+            $seenLower[$lower] = true;
+            $out[] = $tag;
         }
-        if ($pendingEtaDays <= 0) {
-            return 'כל השלבים המוגדרים הושלמו או אין הערכת זמן נותרת.';
-        }
 
-        return 'הערכת זמן משוערת לשלבים שנותרו: כ-'.$pendingEtaDays.' ימים (הערכה בלבד).';
+        return $out;
     }
 }
