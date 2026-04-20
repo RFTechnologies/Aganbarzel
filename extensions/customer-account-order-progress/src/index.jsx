@@ -39,6 +39,17 @@ function getTagTone(tag) {
   return "info";
 }
 
+function getTagTextAppearance(tag) {
+  const tone = getTagTone(tag);
+  if (tone === "success") {
+    return {appearance: "success", check: "✅"};
+  }
+  if (tone === "warning") {
+    return {appearance: "warning", check: "⚠"};
+  }
+  return {appearance: "info", check: "✔"};
+}
+
 function getPrimaryStatus(payload) {
   if (payload?.cancelled_at) {
     return {
@@ -226,21 +237,16 @@ function OrderProgressBlock() {
       {checklistTags.length > 0 ? (
         <BlockStack spacing="tight">
           <Text emphasis="bold">צ'קליסט תגיות ההזמנה</Text>
-          <Banner status="success" title="תגיות ההתקדמות עודכנו">
-            <Text>
-              כל שורה כאן מבוססת ישירות על תגיות מההזמנה ב-Shopify Admin.
-            </Text>
-          </Banner>
           {checklistTags.map((tag) => (
             <BlockStack key={tag} spacing="extraTight">
-              <InlineStack spacing="tight" inlineAlignment="space-between">
-                <InlineStack spacing="tight">
-                  <Badge tone={getTagTone(tag)}>תגית</Badge>
-                  <Text emphasis="bold">✓ {formatTagLabel(tag)}</Text>
+              <InlineStack spacing="extraTight" inlineAlignment="space-between">
+                <InlineStack spacing="extraTight">
+                  <Text emphasis="bold" appearance={getTagTextAppearance(tag).appearance}>
+                    {getTagTextAppearance(tag).check} {formatTagLabel(tag)}
+                  </Text>
                 </InlineStack>
                 <Badge tone="success">עודכן</Badge>
               </InlineStack>
-              <Text size="small">מזהה תגית: {tag}</Text>
             </BlockStack>
           ))}
         </BlockStack>
