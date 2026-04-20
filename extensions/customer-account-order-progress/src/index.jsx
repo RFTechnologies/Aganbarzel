@@ -21,6 +21,24 @@ export default reactExtension(
  */
 const API_BASE_URL = "https://staging.aganbarzel.co.il";
 
+function formatTagLabel(tag) {
+  return String(tag)
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getTagTone(tag) {
+  const value = String(tag).toLowerCase();
+  if (value.includes("delivery") || value.includes("pickup") || value.includes("ready")) {
+    return "success";
+  }
+  if (value.includes("pending") || value.includes("hold") || value.includes("blocked")) {
+    return "warning";
+  }
+  return "info";
+}
+
 function getPrimaryStatus(payload) {
   if (payload?.cancelled_at) {
     return {
@@ -143,8 +161,8 @@ function OrderProgressBlock() {
         <Text emphasis="bold">התקדמות ההזמנה</Text>
         <Banner status="info" title="תצוגת עורך">
           <Text>
-            ברגע השמירה, בדף ההזמנה האמיתי יוצגו השלבים, הערכת הזמן והודעות
-            תשלום לפי תגיות וסטטוס התשלום ב-Shopify.
+            ברגע השמירה, בדף ההזמנה האמיתי יוצגו תגיות ההזמנה כצ'קליסט דינמי
+            לפי מה שנוסף להזמנה ב-Shopify Admin.
           </Text>
         </Banner>
       </BlockStack>
@@ -168,11 +186,8 @@ function OrderProgressBlock() {
     );
   }
 
-  const steps = Array.isArray(payload?.steps) ? payload.steps : [];
   const orderTags = Array.isArray(payload?.order_tags) ? payload.order_tags : [];
-  const doneSteps = steps.filter((step) => step.done).length;
-  const totalSteps = steps.length;
-  const nextPendingStep = steps.find((step) => !step.done);
+  const checklistTags = orderTags.filter((tag) => typeof tag === "string" && tag.trim() !== "");
   const status = getPrimaryStatus(payload);
 
   return (
@@ -190,63 +205,43 @@ function OrderProgressBlock() {
         <Text>{status.message}</Text>
       </Banner>
 
-      {totalSteps > 0 ? (
+      {checklistTags.length > 0 ? (
         <BlockStack spacing="extraTight">
           <Text emphasis="bold" size="small">
-            סטטוס שלבים: {doneSteps}/{totalSteps} הושלמו
+            צ'קליסט דינמי לפי תגיות: {checklistTags.length} תגיות פעילות
           </Text>
-          {nextPendingStep ? (
-            <Text size="small">השלב הבא: {nextPendingStep.label_he}</Text>
-          ) : (
-            <Text size="small">כל השלבים הושלמו.</Text>
-          )}
+          <Text size="small">
+            כל תג שמתווסף להזמנה ב-Shopify Admin יוצג כאן אוטומטית.
+          </Text>
         </BlockStack>
       ) : (
-        <Banner status="warning" title="אין שלבים מוגדרים">
-          <Text>יש להגדיר שלבים בשרת לפני הצגת רשימת ההתקדמות.</Text>
+        <Banner status="warning" title="אין תגיות על ההזמנה">
+          <Text>
+            לא נמצאו תגיות להזמנה זו. הוספת תגיות ב-Shopify Admin תציג אותן כאן
+            מייד כצ'קליסט.
+          </Text>
         </Banner>
       )}
 
-      {payload?.eta_summary_he ? (
-        <Banner status="info" title="הערכת זמן">
-          <Text>{payload.eta_summary_he}</Text>
-        </Banner>
-      ) : null}
-
-      {steps.length > 0 ? (
+      {checklistTags.length > 0 ? (
         <BlockStack spacing="tight">
-          <Text emphasis="bold">צ'קליסט ייצור</Text>
-          {steps.map((step) => (
-            <BlockStack key={step.key || step.label_he} spacing="none">
-              <InlineStack spacing="tight" inlineAlignment="space-between">
-                <Text emphasis={step.done ? "bold" : undefined}>
-                  {step.done ? "✓ הושלם: " : "○ ממתין: "}
-                  {step.label_he}
-                </Text>
-                <Badge tone={step.done ? "success" : "attention"}>
-                  {step.done ? "בוצע" : "בהמתנה"}
-                </Badge>
-              </InlineStack>
-              {!step.done && typeof step.eta_days === "number" ? (
-                <Text size="small">הערכת זמן לשלב זה: כ-{step.eta_days} ימים</Text>
-              ) : null}
-            </BlockStack>
-          ))}
-        </BlockStack>
-      ) : null}
-
-      {orderTags.length > 0 ? (
-        <BlockStack spacing="tight">
-          <Text size="small" emphasis="bold">
-            תגיות טכניות על ההזמנה ({orderTags.length})
-          </Text>
-          <Text size="small">
-            תגיות אלו משמשות את המערכת לחישוב ההתקדמות והסטטוס.
-          </Text>
-          {orderTags.map((tag) => (
-            <Text key={tag} size="small">
-              • {tag}
+          <Text emphasis="bold">צ'קליסט תגיות ההזמנה</Text>
+          <Banner status="success" title="תגיות ההתקדמות עודכנו">
+            <Text>
+              כל שורה כאן מבוססת ישירות על תגיות מההזמנה ב-Shopify Admin.
             </Text>
+          </Banner>
+          {checklistTags.map((tag) => (
+            <BlockStack key={tag} spacing="extraTight">
+              <InlineStack spacing="tight" inlineAlignment="space-between">
+                <InlineStack spacing="tight">
+                  <Badge tone={getTagTone(tag)}>תגית</Badge>
+                  <Text emphasis="bold">✓ {formatTagLabel(tag)}</Text>
+                </InlineStack>
+                <Badge tone="success">עודכן</Badge>
+              </InlineStack>
+              <Text size="small">מזהה תגית: {tag}</Text>
+            </BlockStack>
           ))}
         </BlockStack>
       ) : null}
