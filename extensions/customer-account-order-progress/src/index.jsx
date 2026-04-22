@@ -216,27 +216,17 @@ function OrderProgressBlock() {
         <Text>{status.message}</Text>
       </Banner>
 
-      {checklistTags.length > 0 ? (
-        <BlockStack spacing="extraTight">
-          <Text emphasis="bold" size="small">
-            צ'קליסט דינמי לפי תגיות: {checklistTags.length} תגיות פעילות
-          </Text>
-          <Text size="small">
-            כל תג שמתווסף להזמנה ב-Shopify Admin יוצג כאן אוטומטית.
-          </Text>
-        </BlockStack>
-      ) : (
+      {checklistTags.length === 0 ? (
         <Banner status="warning" title="אין תגיות על ההזמנה">
           <Text>
             לא נמצאו תגיות להזמנה זו. הוספת תגיות ב-Shopify Admin תציג אותן כאן
             מייד כצ'קליסט.
           </Text>
         </Banner>
-      )}
+      ) : null}
 
       {checklistTags.length > 0 ? (
         <BlockStack spacing="tight">
-          <Text emphasis="bold">צ'קליסט תגיות ההזמנה</Text>
           {checklistTags.map((tag) => (
             <BlockStack key={tag} spacing="extraTight">
               <InlineStack spacing="extraTight" inlineAlignment="space-between">
