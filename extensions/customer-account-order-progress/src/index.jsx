@@ -50,7 +50,7 @@ function getTagTextAppearance(tag) {
   return {appearance: "info", check: "✔"};
 }
 
-function getPrimaryStatus(payload) {
+function getPrimaryStatus(payload, tagsNormalized) {
   if (payload?.cancelled_at) {
     return {
       bannerStatus: "critical",
@@ -71,11 +71,25 @@ function getPrimaryStatus(payload) {
     };
   }
 
-  if (payload?.fulfillment_message_he) {
+  if (tagsNormalized.includes("fulfillment-delivery")) {
     return {
       bannerStatus: "success",
-      title: "המוצר מוכן לאיסוף / משלוח",
-      message: payload.fulfillment_message_he,
+      title: "המוצר מוכן למשלוח",
+      message:
+        payload?.fulfillment_message_he ||
+        "ההזמנה מוכנה למשלוח. תקבלו עדכון כשהמשלוח יישלח.",
+      badgeTone: "success",
+      badgeLabel: "מוכן",
+    };
+  }
+
+  if (tagsNormalized.includes("fulfillment-pickup")) {
+    return {
+      bannerStatus: "success",
+      title: "המוצר מוכן לאיסוף",
+      message:
+        payload?.fulfillment_message_he ||
+        "ההזמנה מוכנה לאיסוף עצמי. תקבלו עדכון עם פרטי האיסוף.",
       badgeTone: "success",
       badgeLabel: "מוכן",
     };
@@ -84,7 +98,7 @@ function getPrimaryStatus(payload) {
   return {
     bannerStatus: "info",
     title: "ההזמנה בתהליך ייצור",
-    message: "המערכת מעדכנת את ההתקדמות לפי תגיות ההזמנה ב-Shopify.",
+    message: null,
     badgeTone: "info",
     badgeLabel: "בתהליך",
   };
@@ -199,7 +213,8 @@ function OrderProgressBlock() {
 
   const orderTags = Array.isArray(payload?.order_tags) ? payload.order_tags : [];
   const checklistTags = orderTags.filter((tag) => typeof tag === "string" && tag.trim() !== "");
-  const status = getPrimaryStatus(payload);
+  const tagsNormalized = checklistTags.map((tag) => String(tag).trim().toLowerCase());
+  const status = getPrimaryStatus(payload, tagsNormalized);
 
   return (
     <BlockStack spacing="loose">
@@ -213,7 +228,7 @@ function OrderProgressBlock() {
       ) : null}
 
       <Banner status={status.bannerStatus} title={status.title}>
-        <Text>{status.message}</Text>
+        {status.message ? <Text>{status.message}</Text> : null}
       </Banner>
 
       {checklistTags.length === 0 ? (
