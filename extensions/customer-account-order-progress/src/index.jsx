@@ -2,9 +2,13 @@ import {
   Banner,
   Badge,
   BlockStack,
+  Card,
+  Divider,
+  Grid,
   InlineStack,
   Spinner,
   Text,
+  View,
   reactExtension,
   useApi,
   useOrder,
@@ -20,35 +24,6 @@ export default reactExtension(
  * Deployed Laravel app URL (no trailing slash).
  */
 const API_BASE_URL = "https://staging.aganbarzel.co.il";
-
-function formatTagLabel(tag) {
-  return String(tag)
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function getTagTone(tag) {
-  const value = String(tag).toLowerCase();
-  if (value.includes("delivery") || value.includes("pickup") || value.includes("ready")) {
-    return "success";
-  }
-  if (value.includes("pending") || value.includes("hold") || value.includes("blocked")) {
-    return "warning";
-  }
-  return "info";
-}
-
-function getTagTextAppearance(tag) {
-  const tone = getTagTone(tag);
-  if (tone === "success") {
-    return {appearance: "success", check: "✅"};
-  }
-  if (tone === "warning") {
-    return {appearance: "warning", check: "⚠"};
-  }
-  return {appearance: "info", check: "✔"};
-}
 
 function getPrimaryStatus(payload, tagsNormalized) {
   if (payload?.cancelled_at) {
@@ -102,6 +77,78 @@ function getPrimaryStatus(payload, tagsNormalized) {
     badgeTone: "info",
     badgeLabel: "בתהליך",
   };
+}
+
+function stepLabel(step) {
+  if (!step || typeof step !== "object") {
+    return "";
+  }
+  const h = step.label_he;
+  const l = step.label;
+  if (typeof h === "string" && h.trim() !== "") {
+    return h;
+  }
+  if (typeof l === "string" && l.trim() !== "") {
+    return l;
+  }
+  return "";
+}
+
+/**
+ * done | in_progress | pending. Uses API `step_state` when present; else first
+ * not-done step is in_progress (match mockup / backend `applyFirstPendingAsInProgress`).
+ */
+function stepStateFor(step, index, firstOpenIndex) {
+  if (step && typeof step === "object") {
+    const s = step.step_state;
+    if (s === "done" || s === "in_progress" || s === "pending") {
+      return s;
+    }
+    if (step.done) {
+      return "done";
+    }
+    if (index === firstOpenIndex) {
+      return "in_progress";
+    }
+  }
+  return "pending";
+}
+
+function StatusCell({state}) {
+  if (state === "done") {
+    return (
+      <InlineStack spacing="tight" blockAlignment="center" inlineAlignment="start">
+        <Text size="small" appearance="success" emphasis="bold">
+          ✓
+        </Text>
+        <Text size="small" appearance="success" emphasis="bold">
+          Completed
+        </Text>
+      </InlineStack>
+    );
+  }
+  if (state === "in_progress") {
+    return (
+      <InlineStack spacing="tight" blockAlignment="center" inlineAlignment="start">
+        <Text size="small" appearance="info">
+          ●
+        </Text>
+        <Text size="small" appearance="info" emphasis="bold">
+          In Progress
+        </Text>
+      </InlineStack>
+    );
+  }
+  return (
+    <InlineStack spacing="tight" blockAlignment="center" inlineAlignment="start">
+      <Text size="small" appearance="subdued">
+        ◯
+      </Text>
+      <Text size="small" appearance="subdued" emphasis="bold">
+        Pending
+      </Text>
+    </InlineStack>
+  );
 }
 
 function OrderProgressBlock() {
@@ -186,8 +233,9 @@ function OrderProgressBlock() {
         <Text emphasis="bold">התקדמות ההזמנה</Text>
         <Banner status="info" title="תצוגת עורך">
           <Text>
-            ברגע השמירה, בדף ההזמנה האמיתי יוצגו תגיות ההזמנה כצ'קליסט דינמי
-            לפי מה שנוסף להזמנה ב-Shopify Admin.
+            בלקוחות אמיתיים מוצגת רשימת שלבים לפי הגדרה במטא-שדה של המוצר
+            (Production checklist) והשלמת כל שלב לפי תגיות שמוסיפים על ההזמנה
+            ב-Admin.
           </Text>
         </Banner>
       </BlockStack>
@@ -212,10 +260,12 @@ function OrderProgressBlock() {
   }
 
   const orderTags = Array.isArray(payload?.order_tags) ? payload.order_tags : [];
-  const checklistTags = orderTags.filter((tag) => typeof tag === "string" && tag.trim() !== "");
-  const tagsNormalized = checklistTags.map((tag) => String(tag).trim().toLowerCase());
+  const tagsNormalized = orderTags
+    .filter((tag) => typeof tag === "string" && tag.trim() !== "")
+    .map((tag) => String(tag).trim().toLowerCase());
   const status = getPrimaryStatus(payload, tagsNormalized);
-
+  const steps = Array.isArray(payload?.steps) ? payload.steps : [];
+  const firstOpenIndex = steps.findIndex((s) => s && !s.done);
   return (
     <BlockStack spacing="loose">
       <InlineStack spacing="tight" inlineAlignment="space-between">
@@ -231,29 +281,80 @@ function OrderProgressBlock() {
         {status.message ? <Text>{status.message}</Text> : null}
       </Banner>
 
-      {checklistTags.length === 0 ? (
-        <Banner status="warning" title="אין תגיות על ההזמנה">
+      {steps.length === 0 ? (
+        <Banner status="warning" title="אין רשימת שלבים זמינה">
           <Text>
-            לא נמצאו תגיות להזמנה זו. הוספת תגיות ב-Shopify Admin תציג אותן כאן
-            מייד כצ'קליסט.
+            אין לנו עדיין מידע מפורט על שלבי הייצור לפריטים בהזמנה זו. אפשר
+            לפנות לחנות לעדכון.
           </Text>
         </Banner>
       ) : null}
 
-      {checklistTags.length > 0 ? (
+      {steps.length > 0 ? (
+        <Card padding>
+          <BlockStack spacing="none">
+            <Text size="small" appearance="subdued" emphasis="bold">
+              Order production checklist (visual component)
+            </Text>
+            <Divider />
+            <Grid columns={["1.1fr", "auto", "1.25fr"]} spacing="none" blockAlignment="center">
+              <Text size="small" appearance="subdued" emphasis="bold">
+                Production stage
+              </Text>
+              <Text size="small" appearance="subdued" emphasis="bold">
+                Status
+              </Text>
+              <Text size="small" appearance="subdued" emphasis="bold">
+                Notes / estimates
+              </Text>
+            </Grid>
+            <Divider />
+            {steps.map((step, index) => {
+              const label = stepLabel(step);
+              const key = String(step.key || "step") + "-" + String(index);
+              const state = stepStateFor(step, index, firstOpenIndex);
+              const notesText =
+                typeof step.notes_display === "string" && step.notes_display.trim() !== ""
+                  ? step.notes_display
+                  : typeof step.note === "string" && step.note.trim() !== ""
+                  ? step.note
+                  : "";
+              const isLast = index === steps.length - 1;
+              return (
+                <BlockStack key={key} spacing="none">
+                  <Grid columns={["1.1fr", "auto", "1.25fr"]} spacing="none" blockAlignment="center">
+                    <Text size="small" emphasis="bold">
+                      {label}
+                    </Text>
+                    <View minInlineSize={120}>
+                      <StatusCell state={state} />
+                    </View>
+                    <Text size="small" appearance="subdued">
+                      {notesText}
+                    </Text>
+                  </Grid>
+                  {!isLast ? <Divider /> : null}
+                </BlockStack>
+              );
+            })}
+          </BlockStack>
+        </Card>
+      ) : null}
+
+      {payload?.eta_summary_he && steps.length > 0 ? (
+        <Text size="small" appearance="subdued">
+          {payload.eta_summary_he}
+        </Text>
+      ) : null}
+
+      {orderTags.length > 0 ? (
         <BlockStack spacing="tight">
-          {checklistTags.map((tag) => (
-            <BlockStack key={tag} spacing="extraTight">
-              <InlineStack spacing="extraTight" inlineAlignment="space-between">
-                <InlineStack spacing="extraTight">
-                  <Text emphasis="bold" appearance={getTagTextAppearance(tag).appearance}>
-                    {getTagTextAppearance(tag).check} {formatTagLabel(tag)}
-                  </Text>
-                </InlineStack>
-                <Badge tone="success">עודכן</Badge>
-              </InlineStack>
-            </BlockStack>
-          ))}
+          <Text size="small" appearance="subdued" emphasis="bold">
+            תגיות בהזמנה
+          </Text>
+          <Text size="small" appearance="subdued">
+            {orderTags.join(", ")}
+          </Text>
         </BlockStack>
       ) : null}
     </BlockStack>

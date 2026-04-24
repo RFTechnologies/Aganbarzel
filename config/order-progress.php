@@ -84,4 +84,23 @@ return [
 
     'fulfillment_message_delivery_he' => 'ההזמנה מוכנה למשלוח. תקבלו עדכון כשהמשלוח יישלח.',
 
+    /*
+    |--------------------------------------------------------------------------
+    | Product metafield checklist (per product in Admin)
+    |--------------------------------------------------------------------------
+    |
+    | Each product can store JSON in a metafield: array of { key, label or
+    | label_he, tag, optional eta_days, position, note }.
+    | The order "done" state for each step is when `tag` exists on the order
+    | (case-insensitive). Set namespace/key to match Settings → Metafields.
+    |
+    */
+    'use_product_metafield_checklist' => true,
+
+    'fallback_steps_when_no_metafield' => true,
+
+    'product_checklist_metafield_namespace' => 'custom',
+
+    'product_checklist_metafield_key' => 'production_checklist',
+
 ];
