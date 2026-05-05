@@ -20,3 +20,7 @@ redirect_urls = [
 
 [webhooks]
 api_version = "2022-04"
+
+[[webhooks.subscriptions]]
+topics = [ "orders/updated" ]
+uri = "/webhooks/shopify/orders-updated"
