@@ -90,7 +90,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | Each product can store JSON in a metafield: array of { key, label or
-    | label_he, tag, optional eta_days, position, note }.
+    | label_he, tag, optional eta_days, position, note (legacy), estimate_note,
+    | auto_from_order }.
     | The order "done" state for each step is when `tag` exists on the order
     | (case-insensitive). Set namespace/key to match Settings → Metafields.
     |
@@ -102,5 +103,35 @@ return [
     'product_checklist_metafield_namespace' => 'custom',
 
     'product_checklist_metafield_key' => 'production_checklist',
+
+    /*
+    |--------------------------------------------------------------------------
+    | First step: auto-complete (order created) without requiring its tag
+    |--------------------------------------------------------------------------
+    |
+    | When true, the first checklist row (lowest position, or flagged below)
+    | is always "done" with completed_at from the Shopify order created_at.
+    |
+    */
+    'auto_complete_first_step' => true,
+
+    /*
+    | position — row with smallest `position` in merged template.
+    | flag — rows with auto_from_order: true in product checklist JSON (lowest position wins).
+    |
+    */
+    'auto_complete_first_step_mode' => 'position',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Order metafield — manual delay / production update (per order)
+    |--------------------------------------------------------------------------
+    |
+    | Namespace/key must match Settings → Custom data → Orders (e.g. Production update).
+    |
+    */
+    'order_production_update_namespace' => 'custom',
+
+    'order_production_update_key' => 'production_update',
 
 ];

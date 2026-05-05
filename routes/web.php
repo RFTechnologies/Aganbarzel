@@ -5,6 +5,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\RalController;
 use App\Http\Controllers\Storefront\AppProxyOrderProgressController;
+use App\Http\Controllers\Webhooks\ShopifyOrdersUpdatedController;
 
 use Illuminate\Support\Facades\Auth;
 
@@ -63,3 +64,14 @@ Route::post('rals/add',[RalController::class, 'add'])->middleware(['verify.shopi
 */
 Route::get('/proxy/order-progress', [AppProxyOrderProgressController::class, 'show'])
     ->name('storefront.app-proxy.order-progress');
+
+/*
+|--------------------------------------------------------------------------
+| Shopify webhooks (HMAC-verified; CSRF excluded in VerifyCsrfToken)
+|--------------------------------------------------------------------------
+|
+| Partner Dashboard → Orders updated → POST https://YOUR_APP_URL/webhooks/shopify/orders-updated
+|
+*/
+Route::post('/webhooks/shopify/orders-updated', ShopifyOrdersUpdatedController::class)
+    ->name('webhooks.shopify.orders-updated');

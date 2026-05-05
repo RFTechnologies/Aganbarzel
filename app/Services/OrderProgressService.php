@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\OrderProgressStepCompletion;
 use App\Models\User;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use RuntimeException;
 
 class OrderProgressService
@@ -133,6 +135,8 @@ class OrderProgressService
                 'tag' => (string) ($row['tag'] ?? ''),
                 'eta_days' => (int) ($row['eta_days'] ?? 0),
                 'note' => isset($row['note']) ? (string) $row['note'] : null,
+                'estimate_note' => isset($row['estimate_note']) ? (string) $row['estimate_note'] : null,
+                'auto_from_order' => filter_var($row['auto_from_order'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'position' => (int) ($row['position'] ?? $i),
             ];
             $i++;
@@ -180,6 +184,8 @@ class OrderProgressService
                 'tag' => (string) ($row['tag'] ?? ''),
                 'eta_days' => (int) ($row['eta_days'] ?? 0),
                 'note' => isset($row['note']) ? (string) $row['note'] : null,
+                'estimate_note' => isset($row['estimate_note']) ? (string) $row['estimate_note'] : null,
+                'auto_from_order' => filter_var($row['auto_from_order'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'position' => (int) ($row['position'] ?? $i),
             ];
             $i++;
@@ -285,8 +291,13 @@ class OrderProgressService
      * @param  list<array<string, mixed>>  $templateRows
      * @return array{0: list<array<string, mixed>>, 1: bool, 2: int}
      */
-    private function buildStepsFromTemplate(array $templateRows, array $tagsNormalized, bool $paymentBlocked): array
-    {
+    private function buildStepsFromTemplate(
+        array $templateRows,
+        array $tagsNormalized,
+        bool $paymentBlocked,
+        ?string $autoFirstStepKey,
+        ?string $orderCreatedAtIso
+    ): array {
         $steps = [];
         $pendingEtaDays = 0;
         $allDone = count($templateRows) > 0;
@@ -295,8 +306,10 @@ class OrderProgressService
             if (! is_array($row)) {
                 continue;
             }
+            $rowKey = trim((string) ($row['key'] ?? ''));
             $tag = mb_strtolower(trim((string) ($row['tag'] ?? '')), 'UTF-8');
-            $done = $tag !== '' && in_array($tag, $tagsNormalized, true);
+            $isAutoFirst = $autoFirstStepKey !== null && $rowKey !== '' && $rowKey === $autoFirstStepKey;
+            $done = $isAutoFirst || ($tag !== '' && in_array($tag, $tagsNormalized, true));
             if (! $done) {
                 $allDone = false;
             }
@@ -305,21 +318,32 @@ class OrderProgressService
                 $pendingEtaDays += $eta;
             }
             $label = (string) ($row['label_he'] ?? $row['label'] ?? '');
-            $note = $row['note'] ?? null;
-            $noteStr = is_string($note) && $note !== '' ? $note : null;
+            $legacyNote = $row['note'] ?? null;
+            $legacyNoteStr = is_string($legacyNote) && $legacyNote !== '' ? $legacyNote : null;
+            $estimateExplicit = $row['estimate_note'] ?? null;
+            $estimateExplicitStr = is_string($estimateExplicit) && trim($estimateExplicit) !== ''
+                ? trim($estimateExplicit)
+                : null;
+            $estimateNoteStr = $estimateExplicitStr ?? $legacyNoteStr;
 
             $etaForResponse = $done ? null : ($paymentBlocked ? null : $eta);
-            $notesDisplay = $this->composeNotesColumnText($noteStr, $etaForResponse);
+            $estimateDisplay = $this->composeEstimateDisplay($estimateNoteStr, $etaForResponse);
+            $completedAt = ($isAutoFirst && $orderCreatedAtIso !== null && $orderCreatedAtIso !== '')
+                ? $orderCreatedAtIso
+                : null;
 
             $steps[] = [
-                'key' => (string) ($row['key'] ?? ''),
+                'key' => $rowKey,
                 'label_he' => $label,
                 'label' => $label,
                 'tag' => (string) ($row['tag'] ?? ''),
-                'note' => $noteStr,
+                'note' => $estimateNoteStr,
+                'estimate_note' => $estimateNoteStr,
                 'done' => $done,
                 'eta_days' => $etaForResponse,
-                'notes_display' => $notesDisplay,
+                'estimate_display' => $estimateDisplay,
+                'notes_display' => $estimateDisplay,
+                'completed_at' => $completedAt,
             ];
         }
 
@@ -333,20 +357,20 @@ class OrderProgressService
     }
 
     /**
-     * Notes / estimates column: metafield note plus optional ETA line (mockup: “Notes / Estimates”).
+     * Predefined estimate column: template text plus optional ETA line.
      */
-    private function composeNotesColumnText(?string $noteStr, $etaForResponse): ?string
+    private function composeEstimateDisplay(?string $estimateNoteStr, $etaForResponse): ?string
     {
         $etaLine = null;
         if (is_int($etaForResponse) && $etaForResponse > 0) {
             $etaLine = 'הערכה: כ-'.$etaForResponse.' ימים (הערכה בלבד)';
         }
 
-        if ($noteStr !== null && $etaLine !== null) {
-            return $noteStr.' · '.$etaLine;
+        if ($estimateNoteStr !== null && $etaLine !== null) {
+            return $estimateNoteStr.' · '.$etaLine;
         }
-        if ($noteStr !== null) {
-            return $noteStr;
+        if ($estimateNoteStr !== null) {
+            return $estimateNoteStr;
         }
 
         return $etaLine;
@@ -378,13 +402,11 @@ class OrderProgressService
         return $steps;
     }
 
-    private function buildFromOrderArray(User $shop, array $order): array
+    /**
+     * @return array{rows: list<array<string, mixed>>, source: string}
+     */
+    private function resolveMergedTemplateRows(User $shop, array $order): array
     {
-        $tagsNormalized = $this->normalizeTagsLower((string) Arr::get($order, 'tags', ''));
-        $financialStatus = (string) Arr::get($order, 'financial_status', '');
-        $fulfillmentStatus = (string) Arr::get($order, 'fulfillment_status', '');
-        $paymentBlocked = $this->isPaymentBlocked($financialStatus);
-
         $stepsConfig = config('order-progress.steps', []);
         if (! is_array($stepsConfig)) {
             $stepsConfig = [];
@@ -412,11 +434,240 @@ class OrderProgressService
             $templateRows = $this->configStepsAsTemplates($stepsConfig);
         }
 
+        return ['rows' => $templateRows, 'source' => $checklistSource];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $templateRows
+     */
+    private function resolveAutoFirstStepKey(array $templateRows): ?string
+    {
+        if (! (bool) config('order-progress.auto_complete_first_step', false)) {
+            return null;
+        }
+
+        if ($templateRows === []) {
+            return null;
+        }
+
+        $mode = (string) config('order-progress.auto_complete_first_step_mode', 'position');
+
+        if ($mode === 'flag') {
+            $bestKey = null;
+            $bestPos = PHP_INT_MAX;
+            foreach ($templateRows as $row) {
+                if (! is_array($row) || empty($row['auto_from_order'])) {
+                    continue;
+                }
+                $k = trim((string) ($row['key'] ?? ''));
+                if ($k === '') {
+                    continue;
+                }
+                $p = (int) ($row['position'] ?? PHP_INT_MAX);
+                if ($p < $bestPos) {
+                    $bestPos = $p;
+                    $bestKey = $k;
+                }
+            }
+
+            return $bestKey;
+        }
+
+        $bestKey = null;
+        $minPos = PHP_INT_MAX;
+        foreach ($templateRows as $i => $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $k = trim((string) ($row['key'] ?? ''));
+            if ($k === '') {
+                continue;
+            }
+            $p = (int) ($row['position'] ?? $i);
+            if ($p < $minPos) {
+                $minPos = $p;
+                $bestKey = $k;
+            }
+        }
+
+        return $bestKey;
+    }
+
+    private function normalizeShopifyDatetimeToIso8601($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse((string) $value)->utc()->toIso8601String();
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $steps
+     * @return list<array<string, mixed>>
+     */
+    private function mergeCompletionDatesFromDatabase(User $shop, int $shopifyOrderId, array $steps): array
+    {
+        if ($shopifyOrderId < 1 || $steps === []) {
+            return $steps;
+        }
+
+        $map = OrderProgressStepCompletion::query()
+            ->where('user_id', $shop->id)
+            ->where('shopify_order_id', $shopifyOrderId)
+            ->pluck('completed_at', 'step_key');
+
+        foreach ($steps as $i => $step) {
+            if (! is_array($step) || empty($step['done'])) {
+                continue;
+            }
+            if (! empty($step['completed_at'])) {
+                continue;
+            }
+            $key = (string) ($step['key'] ?? '');
+            if ($key === '' || ! isset($map[$key])) {
+                continue;
+            }
+            $steps[$i]['completed_at'] = Carbon::parse($map[$key])->utc()->toIso8601String();
+        }
+
+        return $steps;
+    }
+
+    private function fetchOrderProductionUpdateNote(User $shop, int $orderId): ?string
+    {
+        $namespace = trim((string) config('order-progress.order_production_update_namespace', 'custom'));
+        $key = trim((string) config('order-progress.order_production_update_key', 'production_update'));
+        if ($namespace === '' || $key === '' || $orderId < 1) {
+            return null;
+        }
+
+        $version = config('shopify-app.api_version', '2022-04');
+        $path = '/admin/api/'.$version.'/orders/'.$orderId.'/metafields.json';
+        $response = $shop->api()->rest('GET', $path, ['query' => ['limit' => 250]]);
+
+        if (! empty($response['errors'])) {
+            return null;
+        }
+
+        $body = $response['body'] ?? null;
+        if (is_object($body)) {
+            $body = json_decode(json_encode($body), true);
+        }
+        if (! is_array($body)) {
+            return null;
+        }
+
+        $metafields = $body['metafields'] ?? null;
+        if (! is_array($metafields)) {
+            return null;
+        }
+
+        $nsLower = mb_strtolower($namespace, 'UTF-8');
+        $keyLower = mb_strtolower($key, 'UTF-8');
+
+        foreach ($metafields as $mf) {
+            if (! is_array($mf)) {
+                continue;
+            }
+            $mfNs = mb_strtolower((string) ($mf['namespace'] ?? ''), 'UTF-8');
+            $mfKey = mb_strtolower((string) ($mf['key'] ?? ''), 'UTF-8');
+            if ($mfNs !== $nsLower || $mfKey !== $keyLower) {
+                continue;
+            }
+            $val = trim((string) ($mf['value'] ?? ''));
+
+            return $val !== '' ? $val : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Merged checklist templates for an order payload (products + fallback). Used by webhooks and API.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function mergedChecklistTemplatesForOrder(User $shop, array $order): array
+    {
+        return $this->resolveMergedTemplateRows($shop, $order)['rows'];
+    }
+
+    /**
+     * Persist first-seen completion timestamps when order tags include a step tag (excludes auto-first step).
+     */
+    public function recordStepCompletionsFromWebhook(User $shop, array $orderPayload): void
+    {
+        $orderId = (int) Arr::get($orderPayload, 'id');
+        if ($orderId < 1) {
+            return;
+        }
+
+        $templates = $this->mergedChecklistTemplatesForOrder($shop, $orderPayload);
+        if ($templates === []) {
+            return;
+        }
+
+        $tagsNormalized = $this->normalizeTagsLower((string) Arr::get($orderPayload, 'tags', ''));
+        $autoKey = $this->resolveAutoFirstStepKey($templates);
+        $now = Carbon::now('UTC');
+
+        foreach ($templates as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $stepKey = trim((string) ($row['key'] ?? ''));
+            if ($stepKey === '') {
+                continue;
+            }
+            if ($autoKey !== null && $stepKey === $autoKey) {
+                continue;
+            }
+            $tag = mb_strtolower(trim((string) ($row['tag'] ?? '')), 'UTF-8');
+            if ($tag === '' || ! in_array($tag, $tagsNormalized, true)) {
+                continue;
+            }
+
+            OrderProgressStepCompletion::query()->firstOrCreate(
+                [
+                    'user_id' => $shop->id,
+                    'shopify_order_id' => $orderId,
+                    'step_key' => $stepKey,
+                ],
+                ['completed_at' => $now]
+            );
+        }
+    }
+
+    private function buildFromOrderArray(User $shop, array $order): array
+    {
+        $tagsNormalized = $this->normalizeTagsLower((string) Arr::get($order, 'tags', ''));
+        $financialStatus = (string) Arr::get($order, 'financial_status', '');
+        $fulfillmentStatus = (string) Arr::get($order, 'fulfillment_status', '');
+        $paymentBlocked = $this->isPaymentBlocked($financialStatus);
+
+        $resolved = $this->resolveMergedTemplateRows($shop, $order);
+        $templateRows = $resolved['rows'];
+        $checklistSource = $resolved['source'];
+
+        $autoFirstKey = $this->resolveAutoFirstStepKey($templateRows);
+        $orderCreatedIso = $this->normalizeShopifyDatetimeToIso8601(Arr::get($order, 'created_at'));
+
         [$steps, $allStepsDone, $pendingEtaDays] = $this->buildStepsFromTemplate(
             $templateRows,
             $tagsNormalized,
-            $paymentBlocked
+            $paymentBlocked,
+            $autoFirstKey,
+            $orderCreatedIso
         );
+
+        $shopifyOrderId = (int) Arr::get($order, 'id');
+        $steps = $this->mergeCompletionDatesFromDatabase($shop, $shopifyOrderId, $steps);
+        $productionUpdateNote = $this->fetchOrderProductionUpdateNote($shop, $shopifyOrderId);
 
         $pickupTag = mb_strtolower(trim((string) config('order-progress.pickup_tag', '')), 'UTF-8');
         $deliveryTag = mb_strtolower(trim((string) config('order-progress.delivery_tag', '')), 'UTF-8');
@@ -467,6 +718,7 @@ class OrderProgressService
             'updated_at' => (string) Arr::get($order, 'updated_at', ''),
             'order_tags' => $orderTagsDisplay,
             'checklist_source' => $checklistSource,
+            'production_update_note' => $productionUpdateNote,
         ];
     }
 

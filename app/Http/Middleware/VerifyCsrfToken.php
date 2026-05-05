@@ -15,6 +15,7 @@ class VerifyCsrfToken extends Middleware
         'tags/add',
         'tags/updateDate',
         'rals/add',
-        'rals/delete'
+        'rals/delete',
+        'webhooks/shopify/orders-updated',
     ];
 }

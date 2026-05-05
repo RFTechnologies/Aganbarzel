@@ -114,6 +114,43 @@ function stepStateFor(step, index, firstOpenIndex) {
   return "pending";
 }
 
+function formatCompletedAt(iso) {
+  if (!iso || typeof iso !== "string") {
+    return "";
+  }
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) {
+      return "";
+    }
+    return new Intl.DateTimeFormat("he-IL", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(d);
+  } catch {
+    return "";
+  }
+}
+
+function estimateColumnText(step) {
+  if (
+    typeof step?.estimate_display === "string" &&
+    step.estimate_display.trim() !== ""
+  ) {
+    return step.estimate_display;
+  }
+  if (
+    typeof step?.notes_display === "string" &&
+    step.notes_display.trim() !== ""
+  ) {
+    return step.notes_display;
+  }
+  if (typeof step?.note === "string" && step.note.trim() !== "") {
+    return step.note;
+  }
+  return "";
+}
+
 function StatusCell({state}) {
   if (state === "done") {
     return (
@@ -234,8 +271,8 @@ function OrderProgressBlock() {
         <Banner status="info" title="תצוגת עורך">
           <Text>
             בלקוחות אמיתיים מוצגת רשימת שלבים לפי הגדרה במטא-שדה של המוצר
-            (Production checklist) והשלמת כל שלב לפי תגיות שמוסיפים על ההזמנה
-            ב-Admin.
+            (Production checklist), תאריכי השלמה לפי תגיות (ועדכון אוטומטי לשלב
+            הראשון), והערות עיכוב מהמטא-שדה Production update בהזמנה.
           </Text>
         </Banner>
       </BlockStack>
@@ -281,6 +318,13 @@ function OrderProgressBlock() {
         {status.message ? <Text>{status.message}</Text> : null}
       </Banner>
 
+      {typeof payload?.production_update_note === "string" &&
+      payload.production_update_note.trim() !== "" ? (
+        <Banner status="warning" title="עדכון מהיצור">
+          <Text>{payload.production_update_note.trim()}</Text>
+        </Banner>
+      ) : null}
+
       {steps.length === 0 ? (
         <Banner status="warning" title="אין רשימת שלבים זמינה">
           <Text>
@@ -297,12 +341,19 @@ function OrderProgressBlock() {
               Order production checklist (visual component)
             </Text>
             <Divider />
-            <Grid columns={["1.1fr", "auto", "1.25fr"]} spacing="none" blockAlignment="center">
+            <Grid
+              columns={["1fr", "auto", "0.95fr", "1.15fr"]}
+              spacing="none"
+              blockAlignment="center"
+            >
               <Text size="small" appearance="subdued" emphasis="bold">
                 Production stage
               </Text>
               <Text size="small" appearance="subdued" emphasis="bold">
                 Status
+              </Text>
+              <Text size="small" appearance="subdued" emphasis="bold">
+                Completed
               </Text>
               <Text size="small" appearance="subdued" emphasis="bold">
                 Notes / estimates
@@ -313,22 +364,25 @@ function OrderProgressBlock() {
               const label = stepLabel(step);
               const key = String(step.key || "step") + "-" + String(index);
               const state = stepStateFor(step, index, firstOpenIndex);
-              const notesText =
-                typeof step.notes_display === "string" && step.notes_display.trim() !== ""
-                  ? step.notes_display
-                  : typeof step.note === "string" && step.note.trim() !== ""
-                  ? step.note
-                  : "";
+              const notesText = estimateColumnText(step);
+              const completedLabel = formatCompletedAt(step.completed_at);
               const isLast = index === steps.length - 1;
               return (
                 <BlockStack key={key} spacing="none">
-                  <Grid columns={["1.1fr", "auto", "1.25fr"]} spacing="none" blockAlignment="center">
+                  <Grid
+                    columns={["1fr", "auto", "0.95fr", "1.15fr"]}
+                    spacing="none"
+                    blockAlignment="center"
+                  >
                     <Text size="small" emphasis="bold">
                       {label}
                     </Text>
                     <View minInlineSize={120}>
                       <StatusCell state={state} />
                     </View>
+                    <Text size="small" appearance="subdued">
+                      {completedLabel !== "" ? completedLabel : "—"}
+                    </Text>
                     <Text size="small" appearance="subdued">
                       {notesText}
                     </Text>

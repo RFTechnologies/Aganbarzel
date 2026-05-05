@@ -1,5 +1,7 @@
 # Order progress — detailed technical implementation plan
 
+**Status:** Implemented in the codebase (migration, webhook, `OrderProgressService`, customer-account extension build, theme assets). Register the Shopify **Orders updated** webhook to `POST /webhooks/shopify/orders-updated` on your app URL and run `php artisan migrate` on each environment.
+
 This document turns the **three client requirements** into an implementation blueprint with **file targets**, **data shapes**, and **example code**. Adapt namespaces and naming to match your conventions after review.
 
 **Requirements covered**
