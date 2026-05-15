@@ -112,8 +112,8 @@ class ProductController extends Controller
                 // creaate product and variant and return variant
                 $variant = $this->createproduct($title, $price, $tag, $image,$shop);
             }else{
-                //Before this count was < 90 and now < 2000
-                if($variant_count['body']['count'] < 2000){
+                // Add variants on same product only while count stays below this cap; then create a new product.
+                if ($variant_count['body']['count'] < 90) {
                     if($products['container'][0]['node']['featuredImage'] != null){
                         $uploadedImage = $this->upload_product_image($image,$product_id,$shop);
                         $image_id = $uploadedImage['body']['image']['id'];
