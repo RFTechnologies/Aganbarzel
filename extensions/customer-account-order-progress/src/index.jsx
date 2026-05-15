@@ -23,7 +23,7 @@ export default reactExtension(
 /**
  * Deployed Laravel app URL (no trailing slash).
  */
-const API_BASE_URL = "https://staging.aganbarzel.co.il";
+const API_BASE_URL = "https://aganbarzel.co.il";
 
 function getPrimaryStatus(payload, tagsNormalized) {
   if (payload?.cancelled_at) {

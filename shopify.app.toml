@@ -4,7 +4,7 @@
 
 client_id = "5ce265f0cd011b8612dffb530a54ce01"
 name = "rf-price-calculator"
-application_url = "https://staging.aganbarzel.co.il"
+application_url = "https://aganbarzel.co.il"
 embedded = true
 
 [access_scopes]
