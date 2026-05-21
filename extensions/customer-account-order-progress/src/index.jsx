@@ -159,7 +159,7 @@ function StatusCell({state}) {
           ✓
         </Text>
         <Text size="small" appearance="success" emphasis="bold">
-          Completed
+          הושלם
         </Text>
       </InlineStack>
     );
@@ -171,7 +171,7 @@ function StatusCell({state}) {
           ●
         </Text>
         <Text size="small" appearance="info" emphasis="bold">
-          In Progress
+          בתהליך
         </Text>
       </InlineStack>
     );
@@ -182,7 +182,7 @@ function StatusCell({state}) {
         ◯
       </Text>
       <Text size="small" appearance="subdued" emphasis="bold">
-        Pending
+        ממתין
       </Text>
     </InlineStack>
   );
